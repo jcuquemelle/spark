@@ -126,7 +126,7 @@ $(document).ready(function() {
         }
 
       $.get("static/historypage-template.html", function(template) {
-        var apps = $(Mustache.render($(template).filter("#history-summary-template").html(),data));
+        historySummary.append(Mustache.render($(template).filter("#history-summary-template").html(),data));
         var selector = "#history-summary-table";
         var conf = {
                     "columns": [
@@ -156,20 +156,18 @@ $(document).ready(function() {
 
         if (hasMultipleAttempts) {
           jQuery.extend(conf, rowGroupConf);
-          var rowGroupCells = apps.find(".rowGroupColumn");
+          var rowGroupCells = document.getElementsByClassName("rowGroupColumn");
           for (i = 0; i < rowGroupCells.length; i++) {
             rowGroupCells[i].style='background-color: #ffffff';
           }
         }
 
         if (!hasMultipleAttempts) {
-          var attemptIDCells = apps.find(".attemptIDSpan");
+          var attemptIDCells = document.getElementsByClassName("attemptIDSpan");
           for (i = 0; i < attemptIDCells.length; i++) {
             attemptIDCells[i].style.display='none';
           }
         }
-
-        historySummary.append(apps);
 
         if ($(selector.concat(" tr")).length < 20) {
           $.extend(conf, {paging: false});
