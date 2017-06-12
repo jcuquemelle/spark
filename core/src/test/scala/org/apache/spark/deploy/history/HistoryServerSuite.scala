@@ -16,7 +16,7 @@
  */
 package org.apache.spark.deploy.history
 
-import java.io.{File, FileInputStream, FileWriter, InputStream, IOException}
+import java.io.{File, FileInputStream, FileWriter, IOException, InputStream}
 import java.net.{HttpURLConnection, URL}
 import java.nio.charset.StandardCharsets
 import java.util.zip.ZipInputStream
@@ -24,6 +24,7 @@ import javax.servlet.http.{HttpServletRequest, HttpServletResponse}
 
 import scala.concurrent.duration._
 import scala.language.postfixOps
+import scala.util.control.NonFatal
 
 import com.codahale.metrics.Counter
 import com.google.common.io.{ByteStreams, Files}
@@ -40,7 +41,6 @@ import org.scalatest.{BeforeAndAfter, Matchers}
 import org.scalatest.concurrent.Eventually
 import org.scalatest.mock.MockitoSugar
 import org.scalatest.selenium.WebBrowser
-
 import org.apache.spark._
 import org.apache.spark.ui.SparkUI
 import org.apache.spark.ui.jobs.UIData.JobUIData
@@ -326,11 +326,20 @@ class HistoryServerSuite extends SparkFunSuite with BeforeAndAfter with Matchers
 
       go to s"$url$uiRoot"
 
-      // expect the ajax call to finish in 5 seconds
-      implicitlyWait(org.scalatest.time.Span(5, org.scalatest.time.Seconds))
-
-      // once this findAll call returns, we know the ajax load of the table completed
-      findAll(ClassNameQuery("odd"))
+      // HACK: AJAX call could be slow to execute on older machine
+      // resulting in [[org.openqa.selenium.StaleElementReferenceException]]
+      // or simply a failing test (no links rendered). This hopefully
+      // makes the issue less frequent.
+      (0 until 5).find { _ =>
+        try {
+          // Wait until AJAX call has completed. This is the case if the table would
+          // have at least a single row.
+          implicitlyWait(5 seconds)
+          findAll(ClassNameQuery("odd")).nonEmpty
+        } catch {
+          case NonFatal(_: Throwable) => false
+        }
+      }
 
       val links = findAll(TagNameQuery("a"))
         .map(_.attribute("href"))
@@ -338,7 +347,7 @@ class HistoryServerSuite extends SparkFunSuite with BeforeAndAfter with Matchers
         .map(_.get)
         .filter(_.startsWith(url)).toList
 
-      // there are atleast some URL links that were generated via javascript,
+      // there are at least some URL links that were generated via javascript,
       // and they all contain the spark.ui.proxyBase (uiRoot)
       links.length should be > 4
       all(links) should startWith(url + uiRoot)
